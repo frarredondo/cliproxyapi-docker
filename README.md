@@ -69,6 +69,15 @@ On first start, if `config/config.yaml` does not exist, the entrypoint renders i
 
 The rendered config covers the common settings. For advanced options (provider API keys, model aliases, routing, payload rules), edit `config/config.yaml` — the full annotated reference ships in the image at `/CLIProxyAPI/config.example.yaml`.
 
+### Editing the config on the host
+
+`./config/config.yaml` is bind-mounted into the container, so the file you edit on the host is the file the server reads. To apply changes:
+
+1. **Edit and save the file — that's it for most settings.** The server watches its config and hot-reloads within a few seconds (API keys, provider credentials, routing, retries, management options).
+2. **Confirm it applied** (optional): `docker logs --since 30s cli-proxy-api` — look for a `configuration updated` line. YAML syntax errors also surface here; the server keeps running on the previous config rather than crashing.
+
+**Exceptions — listener-level settings need a restart.** `port`, `host`, and the `tls` block shape the already-bound socket, so run `docker compose restart cli-proxy-api` after changing them. Changing the port also requires updating the compose port mapping, which needs `docker compose up -d` (recreate) instead of a plain restart.
+
 ### Persistence
 
 | Mount | Contents |

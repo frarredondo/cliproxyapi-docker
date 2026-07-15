@@ -1,0 +1,57 @@
+# CLIProxyAPI configuration template.
+# Rendered to config/config.yaml by docker-entrypoint.sh on first start using
+# the CLIPROXY_* environment variables. After that, edit config/config.yaml
+# directly — the template is not re-applied unless the file is deleted.
+#
+# Full reference with every available option: config.example.yaml (shipped in
+# the image) or https://github.com/router-for-me/CLIProxyAPI/blob/main/config.example.yaml
+
+# Bind interface. "" binds all interfaces (required inside a container so the
+# published port works); restrict exposure via Docker port mappings instead.
+host: "${CLIPROXY_HOST}"
+
+# Server port
+port: ${CLIPROXY_PORT}
+
+# OAuth token storage — mounted as a volume so logins survive container
+# replacement.
+auth-dir: "/CLIProxyAPI/auths"
+
+# Client API keys. Every request must carry one of these as a Bearer token.
+api-keys:
+  - "${CLIPROXY_API_KEY}"
+
+# Management API / control panel. Remote (non-localhost) access is disabled by
+# default; even local access requires the secret key. Leave the secret key
+# empty to disable the management API entirely.
+remote-management:
+  allow-remote: ${CLIPROXY_ALLOW_REMOTE_MANAGEMENT}
+  secret-key: "${CLIPROXY_MANAGEMENT_KEY}"
+
+# TLS is off by default — terminate HTTPS at a reverse proxy, or enable this
+# and mount cert/key into the config volume.
+tls:
+  enable: false
+  cert: ""
+  key: ""
+
+# Logging
+debug: ${CLIPROXY_DEBUG}
+logging-to-file: ${CLIPROXY_LOGGING_TO_FILE}
+logs-max-total-size-mb: 100
+error-logs-max-files: 10
+
+# Retry failed upstream requests (403, 408, 500, 502, 503, 504)
+request-retry: 3
+
+# Credential selection when multiple providers/accounts match
+routing:
+  strategy: "round-robin"
+
+# Require authentication on the WebSocket API
+ws-auth: true
+
+# Keep the pprof debug server off in production
+pprof:
+  enable: false
+  addr: "127.0.0.1:8316"

@@ -123,6 +123,53 @@ docker compose exec cli-proxy-api ./CLIProxyAPI --qwen-login     # Qwen
 
 Since the container is headless, add `--no-browser` and complete the OAuth flow in your own browser. If a provider's flow requires a local callback redirect, temporarily uncomment the matching callback port in `docker-compose.yml` (Gemini 8085, Codex 1455, Claude 54545), run `docker compose up -d`, log in, then remove the port again.
 
+## Using with Claude Code
+
+Point Claude Code at the proxy from any machine that can SSH to this host. No server-side changes are needed — everything below happens on the client.
+
+1. **Open an SSH tunnel** (the proxy is only reachable via loopback on the server):
+
+   ```bash
+   ssh -fN -L 8317:localhost:8317 <user>@<server-ip>
+   ```
+
+2. **Add the proxy to `~/.claude/settings.json`** on the client. All three variables go inside the `env` block — a common mistake is placing them at the top level, where they are silently ignored:
+
+   ```json
+   {
+     "env": {
+       "ANTHROPIC_BASE_URL": "http://localhost:8317",
+       "ANTHROPIC_AUTH_TOKEN": "<CLIPROXY_API_KEY from the server's .env>",
+       "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY": "1"
+     }
+   }
+   ```
+
+   `ANTHROPIC_AUTH_TOKEN` is the **client** API key (`CLIPROXY_API_KEY`), not the management key. The third variable is optional: it makes `/model` fetch the proxy's `/v1/models` list, so models from every logged-in provider appear in the picker (requires Claude Code v2.1.129+). Because the proxy translates protocols, selecting a non-Anthropic model there works too.
+
+3. **Validate and restart.** An invalid settings file is ignored *entirely* — no error shown — so check it before wondering why nothing changed:
+
+   ```bash
+   python3 -m json.tool ~/.claude/settings.json
+   ```
+
+   Then fully quit and relaunch `claude` (env vars are read at startup).
+
+4. **Verify.** `/status` should show `http://localhost:8317` as the API endpoint, and `/model` should list the gateway models. On the server, requests appear in the proxy log:
+
+   ```bash
+   docker compose exec cli-proxy-api sh -c 'tail -f /CLIProxyAPI/logs/$(ls -t /CLIProxyAPI/logs | head -1)'
+   ```
+
+Troubleshooting, in the order things usually fail:
+
+| Symptom | Cause / fix |
+|---|---|
+| `connection refused` | Tunnel not running, or pointing at the wrong host |
+| 401 from the proxy | Wrong key — use `CLIPROXY_API_KEY`, check for copy/paste whitespace |
+| Still using your Claude subscription | Run `/logout` once; env vars then take over |
+| `/model` missing gateway models | Settings file invalid or vars outside the `env` block (see step 3); confirm version ≥ 2.1.129 with `claude --version`; test with `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1 claude --debug` and look for `[gatewayDiscovery]` lines |
+
 ## Updating to a new release
 
 1. Check the [releases page](https://github.com/router-for-me/CLIProxyAPI/releases) and read the release notes for config schema changes.

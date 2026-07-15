@@ -29,4 +29,9 @@ if [[ ! -f "${CONFIG_FILE}" ]]; then
     chmod 600 "${CONFIG_FILE}"
 fi
 
+# The binary's default config path is /CLIProxyAPI/config.yaml; ours lives in
+# the mounted config/ directory. Symlink so subcommands run via `docker exec`
+# (e.g. --claude-login) find it without an explicit --config flag.
+ln -sf "${CONFIG_FILE}" /CLIProxyAPI/config.yaml
+
 exec /CLIProxyAPI/CLIProxyAPI "$@"

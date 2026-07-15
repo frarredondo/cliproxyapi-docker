@@ -108,7 +108,7 @@ docker run -d --name cli-proxy-api \
   cliproxyapi:v7.2.78
 ```
 
-To bind the API to localhost only, publish as `-p 127.0.0.1:8317:8317` (compose: `"127.0.0.1:8317:8317"`).
+The port is published on `127.0.0.1` only, so the proxy is reachable just from the machine running Docker. If other devices on your LAN need access, widen the mapping to `-p 8317:8317` (compose: `"8317:8317"`) — and keep strong `api-keys` set, since everything on the network can then reach the API.
 
 ## Provider logins
 

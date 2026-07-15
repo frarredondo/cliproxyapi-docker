@@ -10,7 +10,7 @@ services:
     env_file:
       - .env
     ports:
-      - "8317:8317"
+      - "127.0.0.1:8317:8317"
       # OAuth login callback ports — uncomment only while running a provider
       # login that needs a browser redirect, then comment out again.
       # - "8085:8085"    # Gemini

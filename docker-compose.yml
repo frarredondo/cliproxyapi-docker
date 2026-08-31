@@ -3,8 +3,8 @@ services:
     build:
       context: .
       args:
-        CLIPROXY_VERSION: ${CLIPROXY_VERSION:-v7.2.78}
-    image: cliproxyapi:${CLIPROXY_VERSION:-v7.2.78}
+        CLIPROXY_VERSION: ${CLIPROXY_VERSION:-v7.2.146}
+    image: cliproxyapi:${CLIPROXY_VERSION:-v7.2.146}
     container_name: cli-proxy-api
     restart: unless-stopped
     env_file:

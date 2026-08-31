@@ -6,8 +6,8 @@
 FROM golang:1.26-bookworm AS builder
 
 # Pin to an official release tag. Override at build time:
-#   docker build --build-arg CLIPROXY_VERSION=v7.2.79 ...
-ARG CLIPROXY_VERSION=v7.2.78
+#   docker build --build-arg CLIPROXY_VERSION=v7.2.147 ...
+ARG CLIPROXY_VERSION=v7.2.146
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential git \

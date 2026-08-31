@@ -58,7 +58,7 @@ On first start, if `config/config.yaml` does not exist, the entrypoint renders i
 | Variable | Default | Description |
 |---|---|---|
 | `CLIPROXY_API_KEY` | **required** | Client API key (Bearer token). Generate: `openssl rand -hex 32` |
-| `CLIPROXY_VERSION` | `v7.2.78` | Release tag to build from |
+| `CLIPROXY_VERSION` | `v7.2.146` | Release tag to build from |
 | `CLIPROXY_PORT` | `8317` | Listen port inside the container |
 | `CLIPROXY_HOST` | `""` (all interfaces) | Bind interface inside the container |
 | `CLIPROXY_MANAGEMENT_KEY` | `""` (management API disabled) | Key for the management API / control panel |
@@ -93,9 +93,9 @@ All three survive container recreation and image updates.
 ```bash
 # Build (pinned version, reproducible)
 docker build \
-  --build-arg CLIPROXY_VERSION=v7.2.78 \
+  --build-arg CLIPROXY_VERSION=v7.2.146 \
   --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  -t cliproxyapi:v7.2.78 .
+  -t cliproxyapi:v7.2.146 .
 
 # Run
 docker run -d --name cli-proxy-api \
@@ -105,7 +105,7 @@ docker run -d --name cli-proxy-api \
   -v "$(pwd)/config:/CLIProxyAPI/config" \
   -v cliproxy_auths:/CLIProxyAPI/auths \
   -v cliproxy_logs:/CLIProxyAPI/logs \
-  cliproxyapi:v7.2.78
+  cliproxyapi:v7.2.146
 ```
 
 The port is published on `127.0.0.1` only, so the proxy is reachable just from the machine running Docker. If other devices on your LAN need access, widen the mapping to `-p 8317:8317` (compose: `"8317:8317"`) — and keep strong `api-keys` set, since everything on the network can then reach the API.

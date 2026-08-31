@@ -36,6 +36,47 @@ services:
       start_period: 10s
       retries: 3
 
+  cpa-usage-keeper:
+    build:
+      context: .
+      dockerfile: Dockerfile.keeper
+      args:
+        KEEPER_VERSION: "${KEEPER_VERSION:?not set — run 'make build' or 'make up'; the version comes from cliproxy.lock}"
+        KEEPER_COMMIT: "${KEEPER_COMMIT:?not set — run 'make build' or 'make up'}"
+        BUILD_DATE: "${KEEPER_BUILD_DATE:?not set — run 'make build' or 'make up'}"
+    image: "cpa-usage-keeper:${KEEPER_VERSION:?not set — run 'make build' or 'make up'}"
+    container_name: cpa-usage-keeper
+    restart: unless-stopped
+    depends_on:
+      cli-proxy-api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+    # Deliberately no env_file here: .env holds CLIPROXY_API_KEY, which this
+    # container must never see. Everything it needs is listed explicitly.
+    # (The cli-proxy-api service above keeps env_file and therefore sees the
+    # harmless KEEPER_* version variables — intentional, not accidental.)
+    environment:
+      TZ: "${TZ:-UTC}"
+      # Both point at the proxy over the compose-internal network; the keeper
+      # collects usage over the management API and the RESP usage queue.
+      CPA_BASE_URL: "http://cli-proxy-api:8317"
+      REDIS_QUEUE_ADDR: "cli-proxy-api:8317"
+      # ':-' rather than ':?' on both secrets on purpose: a missing value must
+      # fail only this container (with the keeper's own clear startup error),
+      # not break interpolation for every compose subcommand file-wide.
+      CPA_MANAGEMENT_KEY: "${CLIPROXY_MANAGEMENT_KEY:-}"
+      LOGIN_PASSWORD: "${KEEPER_LOGIN_PASSWORD:-}"
+    volumes:
+      - keeper_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:$${APP_PORT:-8080}$${APP_BASE_PATH:-}/healthz || exit 1"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+
 volumes:
   cliproxy_auths:
   cliproxy_logs:
+  keeper_data:

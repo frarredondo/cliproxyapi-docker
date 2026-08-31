@@ -1,0 +1,121 @@
+# syntax=docker/dockerfile:1
+
+############################################################
+# Source — clone the official cpa-usage-keeper repo at the
+# locked tag and verify the commit (same contract as the CPA
+# Dockerfile). Both later builders consume this stage.
+############################################################
+FROM alpine:3.20 AS src
+
+# The exact upstream tag and commit to build. Both come from cliproxy.lock via
+# the Makefile and deliberately have no defaults — a default here would only
+# ever mean "silently build the wrong version".
+ARG KEEPER_VERSION
+ARG KEEPER_COMMIT
+
+RUN apk add --no-cache git
+
+WORKDIR /src
+
+# The commit SHA is checked here, in the same layer as the clone, for two
+# reasons: it catches upstream moving a tag, and because the SHA appears in
+# this RUN's text it joins the layer cache key — so a moved tag actually
+# rebuilds instead of silently reusing the old source.
+RUN test -n "${KEEPER_VERSION}" || { echo "FATAL: build-arg KEEPER_VERSION is required — build with 'make build'" >&2; exit 1; }; \
+    test -n "${KEEPER_COMMIT}"  || { echo "FATAL: build-arg KEEPER_COMMIT is required — build with 'make build'" >&2; exit 1; }; \
+    git clone --depth 1 --branch "${KEEPER_VERSION}" \
+      https://github.com/Willxup/cpa-usage-keeper.git . && \
+    actual="$(git rev-parse HEAD)" && \
+    if [ "${actual}" != "${KEEPER_COMMIT}" ]; then \
+      echo "FATAL: tag ${KEEPER_VERSION} now resolves to ${actual}," >&2; \
+      echo "       but cliproxy.lock expects ${KEEPER_COMMIT}. Upstream moved the tag." >&2; \
+      echo "       Run 'make update' and review the lockfile diff before building." >&2; \
+      exit 1; \
+    fi
+
+############################################################
+# Web builder — mirrors upstream stage 1. Copying the lock
+# files first keeps the npm ci layer cached across version
+# bumps whenever package-lock.json did not change.
+############################################################
+FROM node:24-alpine AS web-builder
+
+WORKDIR /app/web
+
+COPY --from=src /src/web/package.json /src/web/package-lock.json ./
+RUN npm ci
+COPY --from=src /src/web/ ./
+RUN npm run build
+
+############################################################
+# Go builder — mirrors upstream stage 2 (CGO, stripped,
+# version injected via ldflags; the web bundle is embedded).
+############################################################
+FROM golang:1.26-alpine AS go-builder
+
+WORKDIR /app
+
+RUN apk add --no-cache build-base
+
+COPY --from=src /src/go.mod /src/go.sum ./
+RUN go mod download
+
+COPY --from=src /src/cmd/ ./cmd/
+COPY --from=src /src/internal/ ./internal/
+COPY --from=web-builder /app/web/dist ./web/dist
+COPY --from=src /src/web/static.go ./web/static.go
+
+ARG KEEPER_VERSION
+RUN CGO_ENABLED=1 GOOS=linux go build \
+    -ldflags="-s -w -X cpa-usage-keeper/internal/version.Version=${KEEPER_VERSION}" \
+    -o /out/cpa-usage-keeper ./cmd/server/main.go
+
+############################################################
+# Runtime — mirrors upstream stage 3. The entrypoint is
+# upstream's own, taken from the verified clone; it starts as
+# root to fix /data volume ownership, then su-execs to the
+# non-root "app" user (see the README security notes).
+############################################################
+FROM alpine:3.20
+
+WORKDIR /
+
+RUN apk add --no-cache ca-certificates tzdata su-exec \
+    && addgroup -S app \
+    && adduser -S -G app app \
+    && mkdir -p /data \
+    && chown -R app:app /data
+
+# UTC by default (the app's own default is Asia/Shanghai); override with
+# -e TZ=... at runtime.
+ENV TZ=UTC
+
+COPY --from=go-builder /out/cpa-usage-keeper /app/cpa-usage-keeper
+COPY --from=src /src/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# SQLite database, rotating logs, and scheduled backups all live here.
+VOLUME ["/data"]
+
+# Dashboard / API port.
+EXPOSE 8080
+
+# /healthz is served unauthenticated by the app itself.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD wget -q --spider "http://127.0.0.1:${APP_PORT:-8080}${APP_BASE_PATH:-}/healthz" || exit 1
+
+# Re-declared: ARGs are per-stage, so the src stage's copies are not visible
+# here. Kept last so this cheap layer never invalidates the compile. Upstream
+# has no BuildDate ldflags variable, so the lock's resolved_at lands only in
+# the "created" label.
+ARG KEEPER_VERSION
+ARG KEEPER_COMMIT
+ARG BUILD_DATE=unknown
+LABEL org.opencontainers.image.version="${KEEPER_VERSION}" \
+      org.opencontainers.image.revision="${KEEPER_COMMIT}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.source="https://github.com/Willxup/cpa-usage-keeper"
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["/app/cpa-usage-keeper"]

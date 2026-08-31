@@ -1,6 +1,10 @@
-# Managed by `make update`. The exact upstream build input.
-# commit is the resolved commit SHA; the build verifies it and fails on a mismatch.
+# Managed by `make update`. The exact upstream build inputs.
+# commits are resolved SHAs; each build verifies its own and fails on a mismatch.
 version=v7.2.146
 commit=d31b15916d15b550bbf388fd6da4a47d4d864109
 resolved_at=2026-08-31T21:58:57Z
 source=https://github.com/router-for-me/CLIProxyAPI.git
+keeper_version=v1.15.0
+keeper_commit=696a4659ce1d5d6f2d2d0530e3205eb51fbce889
+keeper_resolved_at=2026-08-31T22:42:53Z
+keeper_source=https://github.com/Willxup/cpa-usage-keeper.git

@@ -12,3 +12,8 @@ README.md
 Makefile
 bin/
 cliproxy.lock
+
+# Neither image COPYs from the local context, so the Dockerfiles themselves
+# can stay out of it too.
+Dockerfile
+Dockerfile.keeper

@@ -53,6 +53,12 @@ routing:
 # Require authentication on the WebSocket API
 ws-auth: true
 
+# Usage statistics — feeds the cpa-usage-keeper dashboard container. On by
+# default in this stack; to turn it off after removing the keeper, edit
+# config/config.yaml directly (the change hot-reloads). Queue retention stays
+# at the upstream default.
+usage-statistics-enabled: true
+
 # Keep the pprof debug server off in production
 pprof:
   enable: false

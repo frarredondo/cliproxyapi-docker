@@ -3,8 +3,15 @@ services:
     build:
       context: .
       args:
-        CLIPROXY_VERSION: ${CLIPROXY_VERSION:-v7.2.146}
-    image: cliproxyapi:${CLIPROXY_VERSION:-v7.2.146}
+        # No literals and no fallbacks here on purpose: the version lives only
+        # in cliproxy.lock, and make supplies it. A default would silently
+        # build something other than what the lockfile records.
+        CLIPROXY_VERSION: "${CLIPROXY_VERSION:?not set — run 'make build' or 'make up'; the version comes from cliproxy.lock}"
+        CLIPROXY_COMMIT: "${CLIPROXY_COMMIT:?not set — run 'make build' or 'make up'}"
+        # Taken from the lockfile's resolved_at, not the wall clock, so
+        # rebuilding the same version stays cache-friendly and reproducible.
+        BUILD_DATE: "${CLIPROXY_BUILD_DATE:?not set — run 'make build' or 'make up'}"
+    image: "cliproxyapi:${CLIPROXY_VERSION:?not set — run 'make build' or 'make up'}"
     container_name: cli-proxy-api
     restart: unless-stopped
     env_file:

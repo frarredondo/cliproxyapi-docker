@@ -5,9 +5,11 @@
 ############################################################
 FROM golang:1.26-bookworm AS builder
 
-# Pin to an official release tag. Override at build time:
-#   docker build --build-arg CLIPROXY_VERSION=v7.2.147 ...
-ARG CLIPROXY_VERSION=v7.2.146
+# The exact upstream tag and commit to build. Both come from cliproxy.lock via
+# the Makefile and deliberately have no defaults — a default here would only
+# ever mean "silently build the wrong version".
+ARG CLIPROXY_VERSION
+ARG CLIPROXY_COMMIT
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential git \
@@ -15,8 +17,21 @@ RUN apt-get update \
 
 WORKDIR /src
 
-RUN git clone --depth 1 --branch "${CLIPROXY_VERSION}" \
-    https://github.com/router-for-me/CLIProxyAPI.git .
+# The commit SHA is checked here, in the same layer as the clone, for two
+# reasons: it catches upstream moving a tag, and because the SHA appears in
+# this RUN's text it joins the layer cache key — so a moved tag actually
+# rebuilds instead of silently reusing the old source.
+RUN test -n "${CLIPROXY_VERSION}" || { echo "FATAL: build-arg CLIPROXY_VERSION is required — build with 'make build'" >&2; exit 1; }; \
+    test -n "${CLIPROXY_COMMIT}"  || { echo "FATAL: build-arg CLIPROXY_COMMIT is required — build with 'make build'" >&2; exit 1; }; \
+    git clone --depth 1 --branch "${CLIPROXY_VERSION}" \
+      https://github.com/router-for-me/CLIProxyAPI.git . && \
+    actual="$(git rev-parse HEAD)" && \
+    if [ "${actual}" != "${CLIPROXY_COMMIT}" ]; then \
+      echo "FATAL: tag ${CLIPROXY_VERSION} now resolves to ${actual}," >&2; \
+      echo "       but cliproxy.lock expects ${CLIPROXY_COMMIT}. Upstream moved the tag." >&2; \
+      echo "       Run 'make update' and review the lockfile diff before building." >&2; \
+      exit 1; \
+    fi
 
 ARG BUILD_DATE=unknown
 
@@ -70,6 +85,14 @@ VOLUME ["/CLIProxyAPI/config", "/CLIProxyAPI/auths", "/CLIProxyAPI/logs"]
 # port means the process is up (connection refused fails the check).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -s -o /dev/null "http://127.0.0.1:${CLIPROXY_PORT:-8317}/" || exit 1
+
+# Re-declared: ARGs are per-stage, so the builder's copies are not visible
+# here. Kept last so this cheap layer never invalidates the Go compile.
+ARG CLIPROXY_VERSION
+ARG CLIPROXY_COMMIT
+LABEL org.opencontainers.image.version="${CLIPROXY_VERSION}" \
+      org.opencontainers.image.revision="${CLIPROXY_COMMIT}" \
+      org.opencontainers.image.source="https://github.com/router-for-me/CLIProxyAPI"
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["--config", "/CLIProxyAPI/config/config.yaml"]

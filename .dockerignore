@@ -7,3 +7,8 @@ auths/
 logs/
 docker-compose.yml
 README.md
+
+# Host-side version tooling; never part of the build context.
+Makefile
+bin/
+cliproxy.lock

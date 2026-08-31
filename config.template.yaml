@@ -41,7 +41,9 @@ logging-to-file: ${CLIPROXY_LOGGING_TO_FILE}
 logs-max-total-size-mb: 100
 error-logs-max-files: 10
 
-# Retry failed upstream requests (403, 408, 500, 502, 503, 504)
+# Additional credential retry rounds after the first round exhausts its
+# eligible credentials. Round 0 is the initial round; round r only admits
+# credentials whose effective request-retry is at least r. 0 disables retries.
 request-retry: 3
 
 # Credential selection when multiple providers/accounts match
